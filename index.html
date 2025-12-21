@@ -32,7 +32,6 @@
 
         .strip-cell input {
             border: none !important;
-            font-weight: bold;
             font-size: 1.1rem;
         }
 
@@ -59,7 +58,6 @@
         .grid-inputs-container select {
             flex: 1;
             width: 0;
-            /* Allow shrinking below content width */
             min-width: 0;
             border: none !important;
             border-right: 1px solid black !important;
@@ -68,8 +66,7 @@
         }
 
         .grid-inputs-container select {
-            flex: 0 0 40px;
-            /* Operator needs less space */
+            flex: 0 0 50px;
         }
 
         .grid-inputs-container input:last-child {
@@ -83,8 +80,26 @@
             box-shadow: inset 0 0 0 2px #0d6efd !important;
         }
 
+        /* Fixed Puzzle Container to sync widths */
+        .puzzle-board {
+            width: 800px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .how-to-play {
+            background-color: #f0f7ff;
+            border-left: 5px solid #0dcaf0;
+            padding: 1rem !important;
+            border-radius: 0.5rem;
+        }
+
         /* Responsive scaling to keep 4 columns and fit everything */
         @media (max-width: 768px) {
+            .puzzle-board {
+                width: 100%;
+            }
+
             .grid-cell {
                 min-height: 85px !important;
                 padding: 0 !important;
@@ -140,7 +155,7 @@
 </head>
 
 <body class="bg-light">
-    <div class="container py-4" style="max-width: 1000px;">
+    <div class="container py-4">
         <div class="text-center mb-4">
             <h1 class="display-5 fw-bold">Tetonor</h1>
             <div class="d-flex justify-content-center gap-2">
@@ -166,29 +181,27 @@
             <button class="btn btn-success btn-sm px-4" id="check-btn">✓ Check Solution</button>
         </div>
 
-        <div id="grid" class="row g-0 border-dark border-thick mx-auto border" style="max-width: fit-content;"></div>
-        <div id="strip" class="d-flex flex-wrap border-dark border-thick mx-auto border mt-4 mb-4"
-            style="max-width: fit-content;"></div>
+        <div class="puzzle-board">
+            <div id="grid" class="row g-0 border-dark border-thick border"></div>
+            <div id="strip" class="d-flex flex-wrap border-dark border-thick border mt-4 mb-4"></div>
+        </div>
 
-        <div class="alert alert-info border-0 shadow-sm mt-5 pt-4">
-            <h6 class="text-center fw-bold mb-3"><i class="bi bi-info-circle me-2"></i>How to Play</h6>
-            <div class="row justify-content-center">
-                <div class="col-md-9">
-                    <ul class="list-unstyled">
-                        <li class="mb-2">📋 <strong>Objective:</strong> Form the 16 grid numbers using 8 pairs from the
-                            strip.</li>
-                        <li class="mb-2">➕ <strong>Equations:</strong> Each grid number = (Number A) <strong>+</strong>
-                            or <strong>×</strong> (Number B).</li>
-                        <li class="mb-2">🔄 <strong>The Twice Rule:</strong> Each pair must be used <strong>exactly
-                                twice</strong>: once for addition (+) and once for multiplication (×).</li>
-                        <li class="mb-2">📏 <strong>Strip Order:</strong> All 16 numbers in the strip are <strong>sorted
-                                in ascending order</strong>.</li>
-                    </ul>
-                    <hr class="my-3 opacity-10">
-                    <p class="text-center small text-muted mb-0">Progress is automatically saved to your browser and the
-                        URL hash.</p>
-                </div>
-            </div>
+        <div class="how-to-play shadow-sm mt-5 puzzle-board">
+            <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2"></i>How to Play</h6>
+            <ul class="list-unstyled mb-0">
+                <li class="mb-2">📋 <strong>Objective:</strong> Form the 16 grid numbers using 8 pairs from the strip.
+                </li>
+                <li class="mb-2">➕/× <strong>Equations:</strong> Each grid number = (Number A) <strong>+</strong> or
+                    <strong>×</strong> (Number B).
+                </li>
+                <li class="mb-2">🔄 <strong>The Twice Rule:</strong> Each pair must be used <strong>exactly
+                        twice</strong>: once for addition (+) and once for multiplication (×).</li>
+                <li class="mb-2">📏 <strong>Strip Order:</strong> All 16 numbers in the strip are <strong>sorted in
+                        ascending order</strong>.</li>
+            </ul>
+            <p class="small text-muted mt-3 mb-0 pt-3 border-top border-info border-opacity-10 text-center">
+                Progress is automatically saved to your browser and the URL hash.
+            </p>
         </div>
     </div>
 
@@ -367,10 +380,10 @@
         function renderStrip() {
             const strip = document.getElementById('strip');
             strip.innerHTML = currentPuzzle.strip.map((value, index) => `
-                <div class="border border-dark text-center bg-white strip-cell d-flex align-items-center justify-content-center p-0">
+                <div class="border border-dark text-center ${value === null ? 'bg-white' : 'bg-light'} strip-cell d-flex align-items-center justify-content-center p-0">
                     ${value === null
-                    ? `<input type="number" data-strip-index="${index}" class="w-100 h-100 text-center border-0 p-0 fs-5 fw-bold">`
-                    : `<span class="fw-bold fs-5">${value}</span>`
+                    ? `<input type="number" data-strip-index="${index}" class="w-100 h-100 text-center border-0 p-0 fs-5 text-primary">`
+                    : `<span class="fw-bold fs-5 text-dark">${value}</span>`
                 }
                 </div>
             `).join('');
