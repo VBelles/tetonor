@@ -7,93 +7,37 @@
     <title>Tetonor Puzzle</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 10px;
-            background-color: #f8f9fa;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0;
-            border: 2px solid black;
-            width: fit-content;
-            margin: 20px auto;
-            max-width: 100%;
-        }
-
         .grid-cell {
-            border: 1px solid black;
-            padding: 10px;
-            text-align: center;
-            background: white;
-            min-width: 140px;
             min-height: 110px;
         }
 
-        .grid-number {
-            font-size: 1.8rem;
-            font-weight: normal;
-            margin-bottom: 8px;
-        }
-
-        .grid-inputs {
-            display: flex;
-            justify-content: center;
-            gap: 2px;
-        }
-
-        .grid-inputs input,
-        .grid-inputs select {
-            width: 42px;
-            height: 35px;
-            text-align: center;
-            border: 1px solid black;
-            font-size: 0.9rem;
-            padding: 0;
-        }
-
-        .strip-container {
-            display: grid;
-            grid-template-columns: repeat(16, 1fr);
-            gap: 0;
-            border: 2px solid black;
-            width: fit-content;
-            margin: 20px auto;
-            max-width: 100%;
-        }
-
         .strip-cell {
-            border: 1px solid black;
-            padding: 5px;
+            min-width: 0;
+            flex: 1 0 6.25%;
+            height: 55px;
+        }
+
+        .border-thick {
+            border-width: 3px !important;
+        }
+
+        /* Input styling to keep it clean */
+        input[type="number"],
+        select {
+            border: 1px solid black !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
             text-align: center;
-            background: white;
-            min-width: 50px;
-            min-height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .strip-cell input {
-            width: 100%;
-            height: 35px;
-            text-align: center;
-            border: none;
-            font-size: 1.1rem;
+            border: none !important;
             font-weight: bold;
+            font-size: 1.1rem;
         }
 
-        .strip-cell input:focus {
-            outline: 2px solid #0d6efd;
-            background-color: #f0f7ff;
-        }
-
-        .strip-number {
-            font-size: 1.1rem;
-            font-weight: bold;
+        .grid-number {
+            font-size: 2rem;
         }
 
         .correct {
@@ -104,100 +48,150 @@
             background-color: #f8d7da !important;
         }
 
-        /* Mobile Adjustments */
-        @media (max-width: 900px) {
-            .grid-container {
-                grid-template-columns: repeat(3, 1fr);
-            }
-
-            .strip-container {
-                grid-template-columns: repeat(8, 1fr);
-            }
+        /* Shared Border Input Group */
+        .grid-inputs-container {
+            display: flex;
+            width: 100%;
+            border-top: 1px solid black;
         }
 
-        @media (max-width: 650px) {
-            .grid-container {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        .grid-inputs-container input,
+        .grid-inputs-container select {
+            flex: 1;
+            width: 0;
+            /* Allow shrinking below content width */
+            min-width: 0;
+            border: none !important;
+            border-right: 1px solid black !important;
+            height: 40px;
+            background: transparent;
+        }
 
-            .strip-container {
-                grid-template-columns: repeat(4, 1fr);
-            }
+        .grid-inputs-container select {
+            flex: 0 0 40px;
+            /* Operator needs less space */
+        }
 
+        .grid-inputs-container input:last-child {
+            border-right: none !important;
+        }
+
+        .grid-inputs-container input:focus,
+        .grid-inputs-container select:focus {
+            z-index: 5;
+            outline: none !important;
+            box-shadow: inset 0 0 0 2px #0d6efd !important;
+        }
+
+        /* Responsive scaling to keep 4 columns and fit everything */
+        @media (max-width: 768px) {
             .grid-cell {
-                min-width: unset;
-                width: 100%;
+                min-height: 85px !important;
+                padding: 0 !important;
+            }
+
+            .grid-number {
+                font-size: 1.3rem !important;
+                padding: 0.5rem 0 !important;
+            }
+
+            .grid-inputs-container input,
+            .grid-inputs-container select {
+                height: 32px !important;
+                font-size: 0.8rem !important;
+            }
+
+            .grid-inputs-container select {
+                flex: 0 0 30px !important;
             }
 
             .strip-cell {
-                min-width: unset;
-                width: 100%;
+                flex: 1 0 12.5% !important;
+                /* 8 items per row */
+                height: 40px !important;
+            }
+
+            .strip-cell input,
+            .strip-cell span {
+                font-size: 0.9rem !important;
+            }
+
+            .container {
+                padding-left: 5px;
+                padding-right: 5px;
             }
         }
 
         @media (max-width: 400px) {
-            .grid-container {
-                grid-template-columns: 1fr;
+            .grid-cell {
+                min-height: 75px !important;
             }
 
             .grid-number {
-                font-size: 1.5rem;
+                font-size: 1.1rem !important;
             }
-        }
 
-        .btn-group-sm>.btn,
-        .btn-sm {
-            padding: .25rem .4rem;
-            font-size: .8rem;
+            .grid-inputs-container input,
+            .grid-inputs-container select {
+                height: 28px !important;
+            }
         }
     </style>
 </head>
 
-<body>
-    <div class="text-center mb-4">
-        <h2>Tetonor Puzzle</h2>
-        <div class="mb-2">
-            <span class="badge bg-primary me-1" id="difficulty-badge">MEDIUM</span>
-            <span class="badge bg-secondary" id="seed-badge">Seed: 1</span>
+<body class="bg-light">
+    <div class="container py-4" style="max-width: 1000px;">
+        <div class="text-center mb-4">
+            <h1 class="display-5 fw-bold">Tetonor</h1>
+            <div class="d-flex justify-content-center gap-2">
+                <span class="badge bg-primary px-3 rounded-pill" id="difficulty-badge">MEDIUM</span>
+                <span class="badge bg-secondary px-3 rounded-pill" id="seed-badge">Seed: 1</span>
+            </div>
         </div>
-    </div>
 
-    <div class="text-center mb-3">
-        <div class="btn-group btn-group-sm me-2" role="group">
-            <button class="btn btn-outline-secondary" id="diff-easy">Easy</button>
-            <button class="btn btn-outline-secondary active" id="diff-medium">Medium</button>
-            <button class="btn btn-outline-secondary" id="diff-hard">Hard</button>
+        <div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-dark" id="diff-easy">Easy</button>
+                <button class="btn btn-outline-dark active" id="diff-medium">Medium</button>
+                <button class="btn btn-outline-dark" id="diff-hard">Hard</button>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-dark" id="prev-btn">← Prev</button>
+                <button class="btn btn-dark" id="next-btn">Next →</button>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-danger" id="reset-btn">↺ Reset</button>
+                <button class="btn btn-info text-white" id="solve-btn">💡 Solve</button>
+            </div>
+            <button class="btn btn-success btn-sm px-4" id="check-btn">✓ Check Solution</button>
         </div>
-        <button class="btn btn-outline-primary btn-sm me-1" id="prev-btn">← Prev</button>
-        <button class="btn btn-outline-primary btn-sm me-2" id="next-btn">Next →</button>
-        <button class="btn btn-danger btn-sm me-1" id="reset-btn">↺ Reset</button>
-        <button class="btn btn-info btn-sm me-1" id="solve-btn">💡 Solve</button>
-        <button class="btn btn-success btn-sm" id="check-btn">✓ Check</button>
-    </div>
 
-    <div class="grid-container" id="grid"></div>
-    <div class="strip-container" id="strip"></div>
+        <div id="grid" class="row g-0 border-dark border-thick mx-auto border" style="max-width: fit-content;"></div>
+        <div id="strip" class="d-flex flex-wrap border-dark border-thick mx-auto border mt-4 mb-4"
+            style="max-width: fit-content;"></div>
 
-    <div class="alert alert-info small mt-4">
-        <h6 class="text-center mb-2">How to play</h6>
-        <div class="row text-start justify-content-center">
-            <div class="col-md-8">
-                <ul class="mb-0">
-                    <li><strong>Objective:</strong> Find 8 unique pairs of numbers that form the 16 numbers in the grid.
-                    </li>
-                    <li><strong>Equations:</strong> Each grid number = (Number A) <strong>+</strong> or
-                        <strong>×</strong> (Number B).
-                    </li>
-                    <li><strong>The Twice Rule:</strong> Every pair must be used <strong>exactly twice</strong>: once
-                        for addition (+) and once for multiplication (×).</li>
-                    <li><strong>Strip Order:</strong> All 16 numbers in the bottom strip are <strong>sorted in ascending
-                            order</strong>.</li>
-                </ul>
-                <div class="text-center mt-2 text-muted italic">Progress is automatically saved to your browser and the
-                    URL!</div>
+        <div class="alert alert-info border-0 shadow-sm mt-5 pt-4">
+            <h6 class="text-center fw-bold mb-3"><i class="bi bi-info-circle me-2"></i>How to Play</h6>
+            <div class="row justify-content-center">
+                <div class="col-md-9">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">📋 <strong>Objective:</strong> Form the 16 grid numbers using 8 pairs from the
+                            strip.</li>
+                        <li class="mb-2">➕ <strong>Equations:</strong> Each grid number = (Number A) <strong>+</strong>
+                            or <strong>×</strong> (Number B).</li>
+                        <li class="mb-2">🔄 <strong>The Twice Rule:</strong> Each pair must be used <strong>exactly
+                                twice</strong>: once for addition (+) and once for multiplication (×).</li>
+                        <li class="mb-2">📏 <strong>Strip Order:</strong> All 16 numbers in the strip are <strong>sorted
+                                in ascending order</strong>.</li>
+                    </ul>
+                    <hr class="my-3 opacity-10">
+                    <p class="text-center small text-muted mb-0">Progress is automatically saved to your browser and the
+                        URL hash.</p>
+                </div>
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="generator.js"></script>
     <script src="validator.js"></script>
@@ -350,16 +344,16 @@
         function renderGrid() {
             const grid = document.getElementById('grid');
             grid.innerHTML = currentPuzzle.grid.map((value, index) => `
-                <div class="grid-cell">
-                    <div class="grid-number">${value}</div>
-                    <div class="grid-inputs">
-                        <input type="number" data-grid-index="${index}" data-input-type="num1" class="p-0 border-dark">
-                        <select data-grid-index="${index}" data-input-type="op" class="p-0 border-dark">
+                <div class="col-3 border border-dark text-center bg-white grid-cell d-flex flex-column overflow-hidden">
+                    <div class="grid-number flex-grow-1 d-flex align-items-center justify-content-center py-2">${value}</div>
+                    <div class="grid-inputs-container">
+                        <input type="number" data-grid-index="${index}" data-input-type="num1">
+                        <select data-grid-index="${index}" data-input-type="op">
                             <option value=""></option>
                             <option value="+">+</option>
                             <option value="×">×</option>
                         </select>
-                        <input type="number" data-grid-index="${index}" data-input-type="num2" class="p-0 border-dark">
+                        <input type="number" data-grid-index="${index}" data-input-type="num2">
                     </div>
                 </div>
             `).join('');
@@ -373,10 +367,10 @@
         function renderStrip() {
             const strip = document.getElementById('strip');
             strip.innerHTML = currentPuzzle.strip.map((value, index) => `
-                <div class="strip-cell">
+                <div class="border border-dark text-center bg-white strip-cell d-flex align-items-center justify-content-center p-0">
                     ${value === null
-                    ? `<input type="number" data-strip-index="${index}">`
-                    : `<span class="strip-number">${value}</span>`
+                    ? `<input type="number" data-strip-index="${index}" class="w-100 h-100 text-center border-0 p-0 fs-5 fw-bold">`
+                    : `<span class="fw-bold fs-5">${value}</span>`
                 }
                 </div>
             `).join('');
