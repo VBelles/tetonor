@@ -286,6 +286,31 @@
             background-color: #fee2e2 !important;
         }
 
+        /* Language Switcher */
+        .lang-switch {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .lang-btn {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .lang-btn.active {
+            background: #1e293b;
+            color: white;
+            border-color: #1e293b;
+        }
+
         /* Focus States */
         input:focus,
         select:focus {
@@ -384,9 +409,13 @@
 
 <body>
     <div class="main-container">
+        <div class="lang-switch">
+            <button onclick="setLanguage('en')" id="lang-en" class="lang-btn">EN</button>
+            <button onclick="setLanguage('es')" id="lang-es" class="lang-btn">ES</button>
+        </div>
 
         <header class="game-header">
-            <h1 class="game-title">Tetonor</h1>
+            <h1 class="game-title" data-i18n="title">Tetonor</h1>
             <div class="badge-group">
                 <span id="difficulty-badge" class="badge badge-primary">MEDIUM</span>
                 <span id="seed-badge" class="badge badge-secondary">Seed: 1</span>
@@ -395,19 +424,19 @@
 
         <nav class="toolbar">
             <div class="btn-group">
-                <button id="diff-easy" class="btn btn-outline">Easy</button>
-                <button id="diff-medium" class="btn btn-outline active">Medium</button>
-                <button id="diff-hard" class="btn btn-outline">Hard</button>
+                <button id="diff-easy" class="btn btn-outline" data-i18n="easy">Easy</button>
+                <button id="diff-medium" class="btn btn-outline active" data-i18n="medium">Medium</button>
+                <button id="diff-hard" class="btn btn-outline" data-i18n="hard">Hard</button>
             </div>
             <div class="btn-group">
-                <button id="prev-btn" class="btn btn-dark">&larr; Prev</button>
-                <button id="next-btn" class="btn btn-dark">Next &rarr;</button>
+                <button id="prev-btn" class="btn btn-dark" data-i18n="prev">← Prev</button>
+                <button id="next-btn" class="btn btn-dark" data-i18n="next">Next →</button>
             </div>
             <div class="btn-group">
-                <button id="reset-btn" class="btn btn-danger">↺ Reset</button>
-                <button id="solve-btn" class="btn btn-info">✨ Solve</button>
+                <button id="reset-btn" class="btn btn-danger" data-i18n="reset">↺ Reset</button>
+                <button id="solve-btn" class="btn btn-info" data-i18n="solve">✨ Solve</button>
             </div>
-            <button id="check-btn" class="btn btn-success">✓ Check Solution</button>
+            <button id="check-btn" class="btn btn-success" data-i18n="checkSolution">✓ Check Solution</button>
         </nav>
 
         <section class="puzzle-board">
@@ -416,26 +445,34 @@
         </section>
 
         <aside class="callout">
-            <h6 class="callout-title">How to Play</h6>
+            <h6 class="callout-title" data-i18n="howToPlay">How to Play</h6>
             <ul class="callout-list">
-                <li>📋 <strong>Objective:</strong> Form the 16 grid numbers using 8 pairs from the strip.</li>
-                <li>➕ <strong>Equations:</strong> Each grid number = (Number A) <strong>+</strong> or <strong>×</strong>
-                    (Number B).</li>
-                <li>🔄 <strong>The Twice Rule:</strong> Each pair must be used <strong>exactly twice</strong>: once for
-                    addition (+) and once for multiplication (×).</li>
-                <li>📏 <strong>Strip Order:</strong> All 16 strip numbers are <strong>sorted in ascending
-                        order</strong>, numbers can be repeated.</li>
+                <li>📋 <strong data-i18n="objectiveLabel">Objective:</strong> <span data-i18n="objectiveDesc">Form the
+                        16 grid numbers using 8 pairs from the strip.</span></li>
+                <li>➕ <strong data-i18n="equationsLabel">Equations:</strong> <span data-i18n="equationsDesc">Each grid
+                        number = (Number A) <strong>+</strong> or <strong>×</strong> (Number B).</span></li>
+                <li>🔄 <strong data-i18n="twiceRuleLabel">The Twice Rule:</strong> <span data-i18n="twiceRuleDesc">Each
+                        pair must be used <strong>exactly twice</strong>: once for addition (+) and once for
+                        multiplication (×).</span></li>
+                <li>📏 <strong data-i18n="stripOrderLabel">Strip Order:</strong> <span data-i18n="stripOrderDesc">All 16
+                        strip numbers are <strong>sorted in ascending order</strong>, numbers can be repeated.</span>
+                </li>
             </ul>
         </aside>
     </div>
 
-    <!-- Core Logic Scripts -->
+    <script src="translations.js"></script>
     <script src="generator.js"></script>
     <script src="validator.js"></script>
     <script src="solver.js"></script>
 
     <script>
         let currentPuzzle = null;
+        const getBrowserLang = () => {
+            const lang = navigator.language || 'en';
+            return lang.startsWith('es') ? 'es' : 'en';
+        };
+        let currentLang = localStorage.getItem('tetonor_lang') || getBrowserLang();
         let solver = new TetonorSolver();
         const ALPHA = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
 
@@ -569,23 +606,47 @@
             container.querySelectorAll('input').forEach(el => el.addEventListener('input', saveState));
         }
 
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('tetonor_lang', lang);
+            applyTranslations();
+            renderPuzzle(); // Refresh badges/labels
+        }
+
+        function applyTranslations() {
+            const t = translations[currentLang];
+            document.documentElement.lang = currentLang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.innerHTML = t[key];
+            });
+
+            // Update language switcher buttons
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.id === `lang-${currentLang}`);
+            });
+        }
+
         function renderPuzzle() {
             const { seed, difficulty } = parseHash();
             const gen = new TetonorGenerator(seed);
             currentPuzzle = gen.generate(difficulty);
 
-            // Update UI Badges
-            document.getElementById('difficulty-badge').textContent = difficulty;
-            document.getElementById('seed-badge').textContent = `Seed: ${seed}`;
+            const t = translations[currentLang];
+            // Update UI Badges with combined translations
+            document.getElementById('difficulty-badge').textContent = t[difficulty].toUpperCase();
+            document.getElementById('seed-badge').textContent = `${t.seed}: ${seed}`;
 
-            // Update Toolbar Active State
-            document.querySelectorAll('.btn-outline').forEach(btn => {
-                btn.classList.toggle('active', btn.id === `diff-${difficulty}`);
+            // Update Toolbar Difficulty Active State
+            document.querySelectorAll('[data-i18n="easy"], [data-i18n="medium"], [data-i18n="hard"]').forEach(btn => {
+                const btnDiff = btn.getAttribute('data-i18n');
+                btn.classList.toggle('active', btnDiff === difficulty);
             });
 
             renderGrid();
             renderStrip();
             loadState();
+            applyTranslations(); // Re-apply to ensure button labels stay synced
         }
 
         // Action Handlers
@@ -623,7 +684,12 @@
                 });
             });
 
-            alert(TetonorValidator.formatErrorMessage(result));
+            const t = translations[currentLang];
+            if (result.success) {
+                alert(t.validationSuccess);
+            } else {
+                alert(t.validationIncomplete);
+            }
         }
 
         // Initialize HUD
@@ -636,7 +702,8 @@
             updateHash(state.seed + 1, state.difficulty);
         };
         document.getElementById('reset-btn').onclick = () => {
-            if (confirm("Reset progress for this puzzle?")) {
+            const t = translations[currentLang];
+            if (confirm(t.confirmReset)) {
                 const state = parseHash();
                 localStorage.removeItem(`tetonor_${state.difficulty}_${state.seed}`);
                 updateHash(state.seed, state.difficulty);
@@ -645,20 +712,26 @@
         };
         document.getElementById('check-btn').onclick = checkSolution;
         document.getElementById('solve-btn').onclick = () => {
+            const t = translations[currentLang];
             const btn = document.getElementById('solve-btn');
-            const solution = solver.solve(currentPuzzle.grid, currentPuzzle.strip);
-            if (solution) {
-                solution.strip.forEach((v, i) => {
-                    const el = document.querySelector(`[data-strip-index="${i}"]`);
-                    if (el) el.value = v;
-                });
-                solution.grid.forEach((c, i) => {
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value = c.num1;
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value = c.op;
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value = c.num2;
-                });
-                saveState();
-            } else { alert("Could not solve."); }
+            btn.textContent = t.solving;
+
+            setTimeout(() => {
+                const solution = solver.solve(currentPuzzle.grid, currentPuzzle.strip);
+                if (solution) {
+                    solution.strip.forEach((v, i) => {
+                        const el = document.querySelector(`[data-strip-index="${i}"]`);
+                        if (el) el.value = v;
+                    });
+                    solution.grid.forEach((c, i) => {
+                        document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value = c.num1;
+                        document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value = c.op;
+                        document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value = c.num2;
+                    });
+                    saveState();
+                } else { alert(t.solveError); }
+                btn.textContent = t.solve;
+            }, 50);
         };
 
         ['easy', 'medium', 'hard'].forEach(d => {
@@ -669,6 +742,7 @@
         });
 
         window.onhashchange = renderPuzzle;
+        applyTranslations();
         renderPuzzle();
 
     </script>
