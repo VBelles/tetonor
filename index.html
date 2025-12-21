@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetonor Puzzle</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            border: 2px solid black;
+            width: fit-content;
+            margin: 20px auto;
+            max-width: 100%;
+        }
+
+        .grid-cell {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: center;
+            background: white;
+            min-width: 140px;
+            min-height: 110px;
+        }
+
+        .grid-number {
+            font-size: 1.8rem;
+            font-weight: normal;
+            margin-bottom: 8px;
+        }
+
+        .grid-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 2px;
+        }
+
+        .grid-inputs input,
+        .grid-inputs select {
+            width: 42px;
+            height: 35px;
+            text-align: center;
+            border: 1px solid black;
+            font-size: 0.9rem;
+            padding: 0;
+        }
+
+        .strip-container {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 0;
+            border: 2px solid black;
+            width: fit-content;
+            margin: 20px auto;
+            max-width: 100%;
+        }
+
+        .strip-cell {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            background: white;
+            min-width: 50px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .strip-cell input {
+            width: 100%;
+            height: 35px;
+            text-align: center;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .strip-cell input:focus {
+            outline: 2px solid #0d6efd;
+            background-color: #f0f7ff;
+        }
+
+        .strip-number {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .correct {
+            background-color: #d1e7dd !important;
+        }
+
+        .incorrect {
+            background-color: #f8d7da !important;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 900px) {
+            .grid-container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .strip-container {
+                grid-template-columns: repeat(8, 1fr);
+            }
+        }
+
+        @media (max-width: 650px) {
+            .grid-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .strip-container {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .grid-cell {
+                min-width: unset;
+                width: 100%;
+            }
+
+            .strip-cell {
+                min-width: unset;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-number {
+                font-size: 1.5rem;
+            }
+        }
+
+        .btn-group-sm>.btn,
+        .btn-sm {
+            padding: .25rem .4rem;
+            font-size: .8rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="text-center mb-4">
+        <h2>Tetonor Puzzle</h2>
+        <div class="mb-2">
+            <span class="badge bg-primary me-1" id="difficulty-badge">MEDIUM</span>
+            <span class="badge bg-secondary" id="seed-badge">Seed: 1</span>
+        </div>
+    </div>
+
+    <div class="text-center mb-3">
+        <div class="btn-group btn-group-sm me-2" role="group">
+            <button class="btn btn-outline-secondary" id="diff-easy">Easy</button>
+            <button class="btn btn-outline-secondary active" id="diff-medium">Medium</button>
+            <button class="btn btn-outline-secondary" id="diff-hard">Hard</button>
+        </div>
+        <button class="btn btn-outline-primary btn-sm me-1" id="prev-btn">← Prev</button>
+        <button class="btn btn-outline-primary btn-sm me-2" id="next-btn">Next →</button>
+        <button class="btn btn-danger btn-sm me-1" id="reset-btn">↺ Reset</button>
+        <button class="btn btn-info btn-sm me-1" id="solve-btn">💡 Solve</button>
+        <button class="btn btn-success btn-sm" id="check-btn">✓ Check</button>
+    </div>
+
+    <div class="grid-container" id="grid"></div>
+    <div class="strip-container" id="strip"></div>
+
+    <div class="alert alert-info small mt-4">
+        <h6 class="text-center mb-2">How to play</h6>
+        <div class="row text-start justify-content-center">
+            <div class="col-md-8">
+                <ul class="mb-0">
+                    <li><strong>Objective:</strong> Find 8 unique pairs of numbers that form the 16 numbers in the grid.
+                    </li>
+                    <li><strong>Equations:</strong> Each grid number = (Number A) <strong>+</strong> or
+                        <strong>×</strong> (Number B).
+                    </li>
+                    <li><strong>The Twice Rule:</strong> Every pair must be used <strong>exactly twice</strong>: once
+                        for addition (+) and once for multiplication (×).</li>
+                    <li><strong>Strip Order:</strong> All 16 numbers in the bottom strip are <strong>sorted in ascending
+                            order</strong>.</li>
+                </ul>
+                <div class="text-center mt-2 text-muted italic">Progress is automatically saved to your browser and the
+                    URL!</div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="generator.js"></script>
+    <script src="validator.js"></script>
+    <script src="solver.js"></script>
+    <script>
+        let currentPuzzle = null;
+        let solver = new TetonorSolver();
+
+        function parseHash() {
+            const hash = window.location.hash.slice(1);
+            const params = hash.split('/');
+            let difficulty = params[0];
+            if (!['easy', 'medium', 'hard'].includes(params[0])) {
+                difficulty = 'medium';
+            }
+            const seed = parseInt(params[1]) || 1;
+            const state = params[2] || null;
+
+            if (seed != parseInt(params[1]) || difficulty != params[0]) {
+                updateHash(seed, difficulty, state);
+            }
+            return { seed, difficulty, state };
+        }
+
+        function updateHash(seed, difficulty, state = null) {
+            let hash = `${difficulty}/${seed}`;
+            if (state) hash += `/${state}`;
+            window.location.hash = hash;
+        }
+
+        // Compact Sparse Map Encoding (Index + Value)
+        // Indices 0-15: Strip
+        // Indices 16-63: Grid (16 cells * 3)
+        const ALPHA = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
+
+        function encodeState() {
+            const inputs = [];
+            // 1. Collect all 64 possible inputs
+            for (let i = 0; i < 16; i++) {
+                const el = document.querySelector(`[data-strip-index="${i}"]`);
+                inputs.push(el ? el.value : "");
+            }
+            for (let i = 0; i < 16; i++) {
+                inputs.push(
+                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value,
+                    document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value,
+                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value
+                );
+            }
+
+            // 2. Only store non-empty values
+            const sparse = [];
+            inputs.forEach((val, i) => {
+                if (val !== "" && val !== null) {
+                    let v = val;
+                    if (v === "+") v = "p";
+                    if (v === "×") v = "m";
+                    sparse.push(ALPHA[i] + v);
+                }
+            });
+
+            return sparse.join(".");
+        }
+
+        function decodeState(encoded) {
+            if (!encoded) return null;
+            try {
+                const state = { s: Array(16).fill(""), g: Array(48).fill("") };
+                const pairs = encoded.split(".");
+
+                pairs.forEach(pair => {
+                    const char = pair[0];
+                    const val = pair.slice(1);
+                    const index = ALPHA.indexOf(char);
+
+                    if (index !== -1) {
+                        let v = val;
+                        if (v === "p") v = "+";
+                        if (v === "m") v = "×";
+
+                        if (index < 16) {
+                            state.s[index] = v;
+                        } else {
+                            state.g[index - 16] = v;
+                        }
+                    }
+                });
+                return state;
+            } catch (e) {
+                console.error("Failed to decode state", e);
+                return null;
+            }
+        }
+
+        function saveState() {
+            if (!currentPuzzle) return;
+            const { seed, difficulty } = parseHash();
+            const encoded = encodeState();
+
+            localStorage.setItem(`tetonor_${difficulty}_${seed}`, encoded);
+
+            // Construct hash (no trailing / if empty)
+            let hash = `${difficulty}/${seed}`;
+            if (encoded) hash += `/${encoded}`;
+            history.replaceState(null, null, `#${hash}`);
+        }
+
+        function loadState() {
+            if (!currentPuzzle) return;
+            const { seed, difficulty, state: urlState } = parseHash();
+
+            const encoded = urlState || localStorage.getItem(`tetonor_${difficulty}_${seed}`);
+
+            if (encoded) {
+                const state = decodeState(encoded);
+                if (state) {
+                    state.s.forEach((val, i) => {
+                        const input = document.querySelector(`[data-strip-index="${i}"]`);
+                        if (input) input.value = val;
+                    });
+                    for (let i = 0; i < 48; i++) {
+                        const cellIdx = Math.floor(i / 3);
+                        const typeIdx = i % 3;
+                        const types = ["num1", "op", "num2"];
+                        const input = document.querySelector(`[data-grid-index="${cellIdx}"][data-input-type="${types[typeIdx]}"]`);
+                        if (input) input.value = state.g[i];
+                    }
+                }
+            }
+        }
+
+        function renderPuzzle() {
+            const { seed, difficulty } = parseHash();
+            const generator = new TetonorGenerator(seed);
+            currentPuzzle = generator.generate(difficulty);
+
+            document.getElementById('difficulty-badge').textContent = difficulty.toUpperCase();
+            document.getElementById('seed-badge').textContent = `Seed: ${seed}`;
+
+            ['easy', 'medium', 'hard'].forEach(diff => {
+                const btn = document.getElementById(`diff-${diff}`);
+                if (btn) btn.classList.toggle('active', diff === difficulty);
+            });
+
+            renderGrid();
+            renderStrip();
+            loadState();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = currentPuzzle.grid.map((value, index) => `
+                <div class="grid-cell">
+                    <div class="grid-number">${value}</div>
+                    <div class="grid-inputs">
+                        <input type="number" data-grid-index="${index}" data-input-type="num1" class="p-0 border-dark">
+                        <select data-grid-index="${index}" data-input-type="op" class="p-0 border-dark">
+                            <option value=""></option>
+                            <option value="+">+</option>
+                            <option value="×">×</option>
+                        </select>
+                        <input type="number" data-grid-index="${index}" data-input-type="num2" class="p-0 border-dark">
+                    </div>
+                </div>
+            `).join('');
+
+            // Add auto-save listeners
+            grid.querySelectorAll('input, select').forEach(el => {
+                el.addEventListener('input', saveState);
+            });
+        }
+
+        function renderStrip() {
+            const strip = document.getElementById('strip');
+            strip.innerHTML = currentPuzzle.strip.map((value, index) => `
+                <div class="strip-cell">
+                    ${value === null
+                    ? `<input type="number" data-strip-index="${index}">`
+                    : `<span class="strip-number">${value}</span>`
+                }
+                </div>
+            `).join('');
+
+            // Add auto-save listeners
+            strip.querySelectorAll('input').forEach(el => {
+                el.addEventListener('input', saveState);
+            });
+        }
+
+        function checkSolution() {
+            // Collect strip inputs
+            const stripInputs = [];
+            currentPuzzle.strip.forEach((value, index) => {
+                if (value === null) {
+                    const input = document.querySelector(`[data-strip-index="${index}"]`);
+                    stripInputs[index] = parseInt(input.value);
+                } else {
+                    stripInputs[index] = null;
+                }
+            });
+
+            // Collect grid inputs
+            const gridInputs = [];
+            for (let i = 0; i < 16; i++) {
+                const num1 = parseInt(document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value);
+                const op = document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value;
+                const num2 = parseInt(document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value);
+                gridInputs.push({ num1, op, num2 });
+            }
+
+            // Validate
+            const result = TetonorValidator.validate(currentPuzzle, { stripInputs, gridInputs });
+
+            // Apply strip feedback
+            result.stripFeedback.forEach(({ index, correct }) => {
+                const input = document.querySelector(`[data-strip-index="${index}"]`);
+                if (input) {
+                    input.classList.toggle('correct', correct);
+                    input.classList.toggle('incorrect', !correct);
+                }
+            });
+
+            // Apply grid feedback
+            result.gridFeedback.forEach(({ index, correct }) => {
+                ['num1', 'op', 'num2'].forEach(type => {
+                    const input = document.querySelector(`[data-grid-index="${index}"][data-input-type="${type}"]`);
+                    input.classList.toggle('correct', correct);
+                    input.classList.toggle('incorrect', !correct);
+                });
+            });
+
+            // Show result
+            alert(TetonorValidator.formatErrorMessage(result));
+        }
+
+        // Event listeners
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            const { seed, difficulty } = parseHash();
+            updateHash(Math.max(1, seed - 1), difficulty);
+        });
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+            const { seed, difficulty } = parseHash();
+            updateHash(seed + 1, difficulty);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            if (confirm("Reset current puzzle progress?")) {
+                const { seed, difficulty } = parseHash();
+                localStorage.removeItem(`tetonor_${difficulty}_${seed}`);
+                updateHash(seed, difficulty);
+                renderPuzzle();
+            }
+        });
+
+        ['easy', 'medium', 'hard'].forEach(diff => {
+            const btn = document.getElementById(`diff-${diff}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const { seed } = parseHash();
+                    updateHash(seed, diff);
+                });
+            }
+        });
+
+        document.getElementById('solve-btn').addEventListener('click', () => {
+            if (!currentPuzzle) return;
+
+            // Show loading state or similar if needed
+            const btn = document.getElementById('solve-btn');
+            const originalText = btn.textContent;
+            btn.textContent = "⌛ Solving...";
+            btn.disabled = true;
+
+            // Use setTimeout to allow UI to update before heavy computation
+            setTimeout(() => {
+                const solution = solver.solve(currentPuzzle.grid, currentPuzzle.strip);
+
+                if (solution) {
+                    // 1. Fill Strip
+                    solution.strip.forEach((val, i) => {
+                        const input = document.querySelector(`[data-strip-index="${i}"]`);
+                        if (input) input.value = val;
+                    });
+
+                    // 2. Fill Grid
+                    solution.grid.forEach((cell, i) => {
+                        if (cell) {
+                            document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value = cell.num1;
+                            document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value = cell.op;
+                            document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value = cell.num2;
+                        }
+                    });
+
+                    saveState();
+                    alert("Puzzle solved! All inputs have been filled.");
+                } else {
+                    alert("Could not find a solution for this puzzle configuration.");
+                }
+
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 10);
+        });
+
+        document.getElementById('check-btn').addEventListener('click', checkSolution);
+        window.addEventListener('hashchange', renderPuzzle);
+
+        renderPuzzle();
+
+    </script>
+</body>
+
+</html>
