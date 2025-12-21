@@ -417,15 +417,15 @@
         <header class="game-header">
             <h1 class="game-title" data-i18n="title">Tetonor</h1>
             <div class="badge-group">
-                <span id="difficulty-badge" class="badge badge-primary">MEDIUM</span>
-                <span id="seed-badge" class="badge badge-secondary">Seed: 1</span>
+                <span id="difficulty-badge" class="badge badge-primary"></span>
+                <span id="seed-badge" class="badge badge-secondary"></span>
             </div>
         </header>
 
         <nav class="toolbar">
             <div class="btn-group">
                 <button id="diff-easy" class="btn btn-outline" data-i18n="easy">Easy</button>
-                <button id="diff-medium" class="btn btn-outline active" data-i18n="medium">Medium</button>
+                <button id="diff-medium" class="btn btn-outline " data-i18n="medium">Medium</button>
                 <button id="diff-hard" class="btn btn-outline" data-i18n="hard">Hard</button>
             </div>
             <div class="btn-group">
@@ -480,8 +480,8 @@
         function parseHash() {
             const hash = window.location.hash.slice(1);
             const params = hash.split('/');
-            let difficulty = params[0] || 'medium';
-            if (!['easy', 'medium', 'hard'].includes(difficulty)) difficulty = 'medium';
+            let difficulty = params[0] || 'easy';
+            if (!['easy', 'medium', 'hard'].includes(difficulty)) difficulty = 'easy';
             const seed = parseInt(params[1]) || 1;
             const state = params[2] || null;
             return { seed, difficulty, state };
@@ -714,24 +714,20 @@
         document.getElementById('solve-btn').onclick = () => {
             const t = translations[currentLang];
             const btn = document.getElementById('solve-btn');
-            btn.textContent = t.solving;
 
-            setTimeout(() => {
-                const solution = solver.solve(currentPuzzle.grid, currentPuzzle.strip);
-                if (solution) {
-                    solution.strip.forEach((v, i) => {
-                        const el = document.querySelector(`[data-strip-index="${i}"]`);
-                        if (el) el.value = v;
-                    });
-                    solution.grid.forEach((c, i) => {
-                        document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value = c.num1;
-                        document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value = c.op;
-                        document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value = c.num2;
-                    });
-                    saveState();
-                } else { alert(t.solveError); }
-                btn.textContent = t.solve;
-            }, 50);
+            const solution = solver.solve(currentPuzzle.grid, currentPuzzle.strip);
+            if (solution) {
+                solution.strip.forEach((v, i) => {
+                    const el = document.querySelector(`[data-strip-index="${i}"]`);
+                    if (el) el.value = v;
+                });
+                solution.grid.forEach((c, i) => {
+                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value = c.num1;
+                    document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value = c.op;
+                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value = c.num2;
+                });
+                saveState();
+            } else { alert(t.solveError); }
         };
 
         ['easy', 'medium', 'hard'].forEach(d => {

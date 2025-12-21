@@ -10,7 +10,7 @@ class TetonorSolver {
      * @param {number} maxAttempts - Limit the search space
      * @returns {Object|null} - The solution or null if not found
      */
-    solve(gridNumbers, stripValues, maxAttempts = 20000) {
+    solve(gridNumbers, stripValues, maxAttempts = 50000) {
         const allPairs = this.findConsistentPairs(gridNumbers);
 
         // Try to find the correct 8-pair combination
@@ -18,38 +18,10 @@ class TetonorSolver {
 
         if (solution) {
             // Map the pairs to grid usage
-            const result = {
+            return {
                 strip: solution.strip,
-                grid: Array(16).fill(null)
+                grid: solution.grid
             };
-
-            // For each of the 8 pairs, we need to find which grid cells it corresponds to
-            // Note: Each pair must be used exactly twice (once for add, once for mult)
-            // across all 16 cells.
-
-            // To be totally safe, let's track which grid cells are filled
-            const filledCells = new Set();
-
-            solution.pairs.forEach(p => {
-                const [a, b] = p.pair;
-                // Find one add use and one mult use for this specific pair in this combination
-                // Note: The 'uses' in p are all possible uses, we only need the ones 
-                // that fit this specific puzzle instance.
-
-                let addUse = p.uses.find(u => !filledCells.has(u.add.index));
-                if (addUse) {
-                    result.grid[addUse.add.index] = { num1: a, op: '+', num2: b };
-                    filledCells.add(addUse.add.index);
-                }
-
-                let multUse = p.uses.find(u => !filledCells.has(u.mult.index));
-                if (multUse) {
-                    result.grid[multUse.mult.index] = { num1: a, op: '×', num2: b };
-                    filledCells.add(multUse.mult.index);
-                }
-            });
-
-            return result;
         }
 
         return null;
@@ -111,55 +83,96 @@ class TetonorSolver {
      */
     findOptimalCombination(allPairs, stripValues, maxAttempts) {
         let tested = 0;
+        let solution = null;
 
-        for (const combo of this.combinations(allPairs, 8)) {
-            tested++;
-            if (tested > maxAttempts) break;
+        // Pre-claculate known strip counts for pruning
+        const knownCounts = new Map();
+        stripValues.forEach(v => {
+            if (v !== null) knownCounts.set(v, (knownCounts.get(v) || 0) + 1);
+        });
 
-            const strip = this.buildStripFromPairs(combo);
+        const backtrack = (pairIdx, currentCombo, usedIndices, currentCounts) => {
+            if (solution || tested > maxAttempts) return;
 
-            if (this.matchesKnownValues(strip, stripValues)) {
-                // Double check that all 16 grid cells can be satisfied by these 8 pairs
-                // Each pair provides 1 add and 1 mult = 2 cells. 8*2 = 16 cells.
-                // We need to ensure there's a unique assignment.
-                if (this.canAssignToGrid(combo)) {
-                    return {
-                        pairs: combo,
-                        strip: strip,
-                        tested: tested
-                    };
+            if (currentCombo.length === 8) {
+                tested++;
+                const strip = this.buildStripFromPairs(currentCombo);
+                if (this.matchesKnownValues(strip, stripValues)) {
+                    // Unique assignment is guaranteed if we tracked indices correctly,
+                    // but we still need the final grid mapping for the UI.
+                    const assignment = this.findGridAssignment(currentCombo, Array(16).fill(null));
+                    if (assignment) {
+                        solution = { pairs: currentCombo, strip, grid: assignment, tested };
+                    }
+                }
+                return;
+            }
+
+            for (let i = pairIdx; i < allPairs.length; i++) {
+                if (solution) return;
+                const p = allPairs[i];
+                const [a, b] = p.pair;
+
+                // 1. Pruning by frequency (if we already have too many of a or b compared to known strip)
+                // Note: This is an optimistic check. We can't prune if we have fewer than known,
+                // only if we have MORE than the possible occurrences. Total spots = 16.
+                // Actually, simple count check:
+                const countA = (currentCounts.get(a) || 0) + 1;
+                const countB = (currentCounts.get(b) || 0) + (a === b ? 1 : 0);
+
+                // If the known strip has N of 'a', and we already used > N, is it invalid?
+                // Not necessarily, because some 'a's might be hidden (null).
+                // But if we know the TOTAL count of 'a' in the strip (by some logic)? 
+                // We don't. We only know partials.
+                // However, we know max count of any number can't exceed 16.
+
+                // 2. Pruning by grid availability: At least one "use" must be available
+                const availableUse = p.uses.find(u => !usedIndices.has(u.add.index) && !usedIndices.has(u.mult.index));
+
+                if (availableUse) {
+                    // Optimistically try all available uses? No, just try the first available for the pair
+                    // since any 'use' of the SAME pair is equivalent for the strip check.
+                    // If findGridAssignment is used at the end, it will handle multiple uses.
+
+                    const nextUsed = new Set(usedIndices);
+                    nextUsed.add(availableUse.add.index);
+                    nextUsed.add(availableUse.mult.index);
+
+                    const nextCounts = new Map(currentCounts);
+                    nextCounts.set(a, (nextCounts.get(a) || 0) + 1);
+                    nextCounts.set(b, (nextCounts.get(b) || 0) + 1);
+
+                    currentCombo.push(p);
+                    backtrack(i + 1, currentCombo, nextUsed, nextCounts);
+                    currentCombo.pop();
                 }
             }
-        }
+        };
 
+        backtrack(0, [], new Set(), new Map());
+        return solution;
+    }
+
+    findGridAssignment(pairs, grid, pairIdx = 0) {
+        if (pairIdx === pairs.length) return grid;
+        const p = pairs[pairIdx];
+        const [a, b] = p.pair;
+        for (const use of p.uses) {
+            if (grid[use.add.index] === null && grid[use.mult.index] === null && use.add.index !== use.mult.index) {
+                const nextGrid = [...grid];
+                nextGrid[use.add.index] = { num1: a, op: '+', num2: b };
+                nextGrid[use.mult.index] = { num1: a, op: '×', num2: b };
+                const result = this.findGridAssignment(pairs, nextGrid, pairIdx + 1);
+                if (result) return result;
+            }
+        }
         return null;
     }
 
     /**
      * Verifies that the 8 pairs can actually cover all 16 cells uniquely
      */
-    canAssignToGrid(pairs) {
-        // This is a bipartite matching problem in theory, but since we know
-        // each pair MUST provide one '+' and one '*', and we have 8 pairs 
-        // and 16 cells, we just need to ensure we can pick 8 distinct 'add' 
-        // indices and 8 distinct 'mult' indices.
 
-        const usedAddIndices = new Set();
-        const usedMultIndices = new Set();
-
-        // Simple greedy assignment for verification
-        for (const p of pairs) {
-            const addUse = p.uses.find(u => !usedAddIndices.has(u.add.index) && !usedMultIndices.has(u.add.index));
-            if (!addUse) return false;
-            usedAddIndices.add(addUse.add.index);
-
-            const multUse = p.uses.find(u => !usedMultIndices.has(u.mult.index) && !usedAddIndices.has(u.mult.index));
-            if (!multUse) return false;
-            usedMultIndices.add(multUse.mult.index);
-        }
-
-        return usedAddIndices.size === 8 && usedMultIndices.size === 8;
-    }
 
     /**
      * Build standard 16-number strip from pairs
