@@ -482,6 +482,7 @@
 
         function init() {
             bindGlobalEvents();
+            applyTranslations(appState.lang);
             updateLanguageButtons(appState.lang);
             handleRoute();
         }
@@ -500,6 +501,8 @@
             if (isDifferent) {
                 appState.puzzle = TetonorGenerator.generate(seed, difficulty);
                 renderBoard(appState.puzzle);
+            } else {
+                clearFeedback();
             }
 
             // Always update UI metadata
@@ -520,6 +523,13 @@
                 } else if (stateEncoded && !savedFromStorage) {
                     localStorage.setItem(`tetonor_${appState.difficulty}_${appState.seed}`, stateEncoded);
                 }
+            } else if (!isDifferent) {
+                // If we are on the same puzzle but have no state (e.g. after reset), we must clear the inputs
+                // because renderBoard() was skipped.
+                fillInputs({
+                    strip: Array(16).fill(null),
+                    grid: Array(16).fill({ num1: "", op: "", num2: "" })
+                });
             }
         }
 
@@ -563,7 +573,7 @@
         function revealSolution() {
             clearFeedback();
             const t = translations[appState.lang];
-            if (!confirm(t.solveConfirm || "Revelar solución? / Reveal solution?")) return;
+            if (!confirm(t.solveConfirm)) return;
 
             const solution = TetonorSolver.solve(appState.puzzle.grid, appState.puzzle.strip);
             if (solution) {
