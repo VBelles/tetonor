@@ -467,55 +467,227 @@
     <script src="solver.js"></script>
 
     <script>
-        let currentPuzzle = null;
-        const getBrowserLang = () => {
-            const lang = navigator.language || 'en';
-            return lang.startsWith('es') ? 'es' : 'en';
-        };
-        let currentLang = localStorage.getItem('tetonor_lang') || getBrowserLang();
-        let solver = new TetonorSolver();
         const ALPHA = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
 
-        // URL Hash Management
+        const appState = {
+            puzzle: null,
+            seed: null,
+            difficulty: null,
+            lang: localStorage.getItem('tetonor_lang') || getBrowserLang()
+        };
+
+        function getBrowserLang() {
+            return (navigator.language || 'en').startsWith('es') ? 'es' : 'en';
+        }
+
+        function init() {
+            bindGlobalEvents();
+            updateLanguageButtons(appState.lang);
+            handleRoute();
+        }
+
+        // --- Routing & Navigation ---
+
+        function handleRoute() {
+            const { seed, difficulty, stateEncoded } = parseHash();
+
+            // Should we regenerate?
+            const isDifferent = seed !== appState.seed || difficulty !== appState.difficulty || !appState.puzzle;
+
+            appState.seed = seed;
+            appState.difficulty = difficulty;
+
+            if (isDifferent) {
+                appState.puzzle = TetonorGenerator.generate(seed, difficulty);
+                renderBoard(appState.puzzle);
+            }
+
+            // Always update UI metadata
+            renderHeader(appState);
+            updateDifficultyButtons(appState.difficulty);
+
+            // Load Inputs
+            const savedFromStorage = localStorage.getItem(`tetonor_${difficulty}_${seed}`);
+            const savedData = stateEncoded || savedFromStorage;
+            const decoded = savedData && decodeState(savedData);
+
+            if (decoded) {
+                fillInputs(decoded);
+                // If we loaded from storage but URL doesn't have it, update URL silent replace
+                if (!stateEncoded && savedFromStorage) {
+                    const hash = `#${difficulty}/${seed}/${savedFromStorage}`;
+                    history.replaceState(null, null, hash);
+                } else if (stateEncoded && !savedFromStorage) {
+                    localStorage.setItem(`tetonor_${appState.difficulty}_${appState.seed}`, stateEncoded);
+                }
+            }
+        }
+
+
         function parseHash() {
-            const hash = window.location.hash.slice(1);
-            const params = hash.split('/');
-            let difficulty = params[0] || 'easy';
-            if (!['easy', 'medium', 'hard'].includes(difficulty)) difficulty = 'easy';
-            const seed = parseInt(params[1]) || 1;
-            const state = params[2] || null;
-            return { seed, difficulty, state };
+            const [diffStr, seedStr, stateStr] = window.location.hash.slice(1).split('/');
+            const difficulty = ['easy', 'medium', 'hard'].includes(diffStr) ? diffStr : 'easy';
+            const seed = parseInt(seedStr) || 1;
+            return { difficulty, seed, stateEncoded: stateStr || null };
         }
 
-        function updateHash(seed, difficulty, state = null) {
-            let hash = `${difficulty}/${seed}`;
-            if (state) hash += `/${state}`;
-            window.location.hash = hash;
+        function navigate(offset) {
+            const newSeed = Math.max(1, appState.seed + offset);
+            window.location.hash = `#${appState.difficulty}/${newSeed}`;
         }
 
-        // State Serialization (Sparse Map)
-        function encodeState() {
-            const inputs = [];
-            // Collect strip
-            for (let i = 0; i < 16; i++) {
-                const el = document.querySelector(`[data-strip-index="${i}"]`);
-                inputs.push(el ? el.value : "");
-            }
-            // Collect grid (16 cells * 3 inputs each)
-            for (let i = 0; i < 16; i++) {
-                inputs.push(
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value,
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value,
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value
-                );
-            }
+        function setDifficulty(diff) {
+            window.location.hash = `#${diff}/${appState.seed}`;
+        }
 
+        // --- Logic & Actions ---
+
+        function checkSolution() {
+            clearFeedback();
+            const { strip, grid } = captureInputs();
+
+            const stripInputs = strip.map((v, i) => appState.puzzle.strip[i] === null ? parseInt(v) : null);
+            const gridInputs = grid.map(g => ({
+                num1: parseInt(g.num1),
+                op: g.op,
+                num2: parseInt(g.num2)
+            }));
+
+            const result = TetonorValidator.validate(appState.puzzle, { stripInputs, gridInputs });
+            showFeedback(result);
+
+            const t = translations[appState.lang];
+            alert(result.success ? t.validationSuccess : t.validationIncomplete);
+        }
+
+        function revealSolution() {
+            clearFeedback();
+            const t = translations[appState.lang];
+            if (!confirm(t.solveConfirm || "Revelar solución? / Reveal solution?")) return;
+
+            const solution = TetonorSolver.solve(appState.puzzle.grid, appState.puzzle.strip);
+            if (solution) {
+                fillInputs(solution);
+                saveCurrentState();
+            } else {
+                alert(t.solveError);
+            }
+        }
+
+        function resetPuzzle() {
+            const t = translations[appState.lang];
+            if (confirm(t.confirmReset)) {
+                localStorage.removeItem(`tetonor_${appState.difficulty}_${appState.seed}`);
+                window.location.hash = `#${appState.difficulty}/${appState.seed}`;
+            }
+        }
+
+        // --- DOM / UI Rendering ---
+
+        function renderHeader(state) {
+            const t = translations[state.lang];
+            document.getElementById('difficulty-badge').textContent = t[state.difficulty].toUpperCase();
+            document.getElementById('seed-badge').textContent = `${t.seed}: ${state.seed}`;
+        }
+
+        function updateDifficultyButtons(difficulty) {
+            document.querySelectorAll('.btn-outline').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.i18n === difficulty);
+            });
+        }
+
+        function updateLanguageButtons(lang) {
+            document.querySelectorAll('.lang-btn').forEach(btn =>
+                btn.classList.toggle('active', btn.id === `lang-${lang}`));
+        }
+
+        function renderBoard(puzzle) {
+            document.getElementById('grid').innerHTML = puzzle.grid.map((val, i) => `
+                <div class="grid-cell">
+                    <div class="grid-number">${val}</div>
+                    <div class="grid-inputs">
+                        <input type="number" id="grid_${i}_num1">
+                        <select id="grid_${i}_op">
+                            <option value=""></option>
+                            <option value="+">+</option>
+                            <option value="×">×</option>
+                        </select>
+                        <input type="number" id="grid_${i}_num2">
+                    </div>
+                </div>`).join('');
+
+            document.getElementById('strip').innerHTML = puzzle.strip.map((val, i) =>
+                val !== null
+                    ? `<div class="strip-cell locked">${val}</div>`
+                    : `<div class="strip-cell"><input type="number" id="strip_${i}" class="strip-input"></div>`
+            ).join('');
+
+            // Bind input changes to state saver
+            document.querySelectorAll('input, select').forEach(el =>
+                el.addEventListener('input', () => saveCurrentState()));
+        }
+
+        function applyTranslations(lang) {
+            const t = translations[lang];
+            document.documentElement.lang = lang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.innerHTML = t[el.dataset.i18n] || el.dataset.i18n;
+            });
+        }
+
+        function setLanguage(lang) {
+            appState.lang = lang;
+            localStorage.setItem('tetonor_lang', lang);
+            applyTranslations(lang);
+            renderHeader(appState);
+            updateLanguageButtons(lang);
+        }
+
+        // --- Persistence Helpers ---
+
+        function saveCurrentState() {
+            const inputs = captureInputs();
+            const encoded = encodeState(inputs);
+            localStorage.setItem(`tetonor_${appState.difficulty}_${appState.seed}`, encoded);
+
+            const hash = `#${appState.difficulty}/${appState.seed}${encoded ? '/' + encoded : ''}`;
+            history.replaceState(null, null, hash);
+        }
+
+        function captureInputs() {
+            const strip = Array.from({ length: 16 }, (_, i) => {
+                return document.getElementById(`strip_${i}`)?.value || "";
+            });
+            const grid = Array.from({ length: 16 }, (_, i) => {
+                return {
+                    num1: document.getElementById(`grid_${i}_num1`)?.value || "",
+                    op: document.getElementById(`grid_${i}_op`)?.value || "",
+                    num2: document.getElementById(`grid_${i}_num2`)?.value || ""
+                };
+            });
+            return { strip, grid };
+        }
+
+        function fillInputs(data) {
+            data.strip?.forEach((val, i) => {
+                const el = document.getElementById(`strip_${i}`);
+                if (el) el.value = val ?? "";
+            });
+
+            data.grid?.forEach((cell, i) => {
+                ['num1', 'op', 'num2'].forEach(key => {
+                    const el = document.getElementById(`grid_${i}_${key}`);
+                    if (el) el.value = cell[key] || "";
+                });
+            });
+        }
+
+        function encodeState({ strip, grid }) {
+            const inputs = [...strip, ...grid.flatMap(g => [g.num1, g.op, g.num2])];
             const sparse = [];
             inputs.forEach((val, i) => {
                 if (val && val !== "") {
-                    let v = val;
-                    if (v === "+") v = "p";
-                    if (v === "×") v = "m";
+                    let v = val === "+" ? "p" : (val === "×" ? "m" : val);
                     sparse.push(ALPHA[i] + v);
                 }
             });
@@ -525,223 +697,55 @@
         function decodeState(encoded) {
             if (!encoded) return null;
             try {
-                const state = { s: Array(16).fill(""), g: Array(48).fill("") };
+                const s = Array(16).fill("");
+                const g = Array(16).fill(null).map(() => ({ num1: "", op: "", num2: "" }));
                 encoded.split(".").forEach(pair => {
                     const index = ALPHA.indexOf(pair[0]);
                     let val = pair.slice(1);
                     if (val === "p") val = "+";
                     if (val === "m") val = "×";
-                    if (index < 16) state.s[index] = val;
-                    else if (index < 64) state.g[index - 16] = val;
+                    if (index < 16) s[index] = val;
+                    else if (index < 64) {
+                        const gIdx = index - 16;
+                        const cellIdx = Math.floor(gIdx / 3);
+                        const types = ["num1", "op", "num2"];
+                        g[cellIdx][types[gIdx % 3]] = val;
+                    }
                 });
-                return state;
+                return { strip: s, grid: g };
             } catch (e) { return null; }
         }
 
-        function saveState() {
-            if (!currentPuzzle) return;
-            const { seed, difficulty } = parseHash();
-            const encoded = encodeState();
-            localStorage.setItem(`tetonor_${difficulty}_${seed}`, encoded);
-            // Silent URL update (doesn't trigger hashchange)
-            history.replaceState(null, null, `#${difficulty}/${seed}${encoded ? '/' + encoded : ''}`);
+        function clearFeedback() {
+            document.querySelectorAll('.correct, .incorrect').forEach(el =>
+                el.classList.remove('correct', 'incorrect'));
         }
 
-        function loadState() {
-            if (!currentPuzzle) return;
-            const { seed, difficulty, state: urlState } = parseHash();
-            const encoded = urlState || localStorage.getItem(`tetonor_${difficulty}_${seed}`);
-
-            if (encoded) {
-                const state = decodeState(encoded);
-                if (!state) return;
-                // Fill strip
-                state.s.forEach((val, i) => {
-                    const input = document.querySelector(`[data-strip-index="${i}"]`);
-                    if (input) input.value = val;
-                });
-                // Fill grid
-                const types = ["num1", "op", "num2"];
-                state.g.forEach((val, i) => {
-                    const idx = Math.floor(i / 3);
-                    const type = types[i % 3];
-                    const input = document.querySelector(`[data-grid-index="${idx}"][data-input-type="${type}"]`);
-                    if (input) input.value = val;
-                });
-            }
-        }
-
-        // Rendering Functions
-        function renderGrid() {
-            const container = document.getElementById('grid');
-            container.innerHTML = currentPuzzle.grid.map((val, i) => `
-                <div class="grid-cell">
-                    <div class="grid-number">${val}</div>
-                    <div class="grid-inputs">
-                        <input type="number" data-grid-index="${i}" data-input-type="num1">
-                        <select data-grid-index="${i}" data-input-type="op">
-                            <option value=""></option>
-                            <option value="+">+</option>
-                            <option value="×">×</option>
-                        </select>
-                        <input type="number" data-grid-index="${i}" data-input-type="num2">
-                    </div>
-                </div>
-            `).join('');
-            container.querySelectorAll('input, select').forEach(el => el.addEventListener('input', saveState));
-        }
-
-        function renderStrip() {
-            const container = document.getElementById('strip');
-            container.innerHTML = currentPuzzle.strip.map((val, i) => {
-                if (val !== null) {
-                    return `<div class="strip-cell locked">${val}</div>`;
-                } else {
-                    return `
-                    <div class="strip-cell">
-                        <input type="number" data-strip-index="${i}" class="strip-input">
-                    </div>`;
-                }
-            }).join('');
-            container.querySelectorAll('input').forEach(el => el.addEventListener('input', saveState));
-        }
-
-        function setLanguage(lang) {
-            currentLang = lang;
-            localStorage.setItem('tetonor_lang', lang);
-            applyTranslations();
-            renderPuzzle(); // Refresh badges/labels
-        }
-
-        function applyTranslations() {
-            const t = translations[currentLang];
-            document.documentElement.lang = currentLang;
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                if (t[key]) el.innerHTML = t[key];
+        function showFeedback(result) {
+            result.stripFeedback?.forEach(f => {
+                document.getElementById(`strip_${f.index}`)?.classList.add(f.correct ? 'correct' : 'incorrect');
             });
+            result.gridFeedback?.forEach(f => {
+                ['num1', 'op', 'num2'].forEach(type => {
+                    document.getElementById(`grid_${f.index}_${type}`)?.classList.add(f.correct ? 'correct' : 'incorrect');
+                });
+            });
+        }
 
-            // Update language switcher buttons
-            document.querySelectorAll('.lang-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.id === `lang-${currentLang}`);
+        function bindGlobalEvents() {
+            window.onhashchange = handleRoute;
+            document.getElementById('prev-btn').onclick = () => navigate(-1);
+            document.getElementById('next-btn').onclick = () => navigate(1);
+            document.getElementById('reset-btn').onclick = resetPuzzle;
+            document.getElementById('check-btn').onclick = checkSolution;
+            document.getElementById('solve-btn').onclick = revealSolution;
+
+            ['easy', 'medium', 'hard'].forEach(d => {
+                document.getElementById(`diff-${d}`).onclick = () => setDifficulty(d);
             });
         }
 
-        function renderPuzzle() {
-            const { seed, difficulty } = parseHash();
-            const gen = new TetonorGenerator(seed);
-            currentPuzzle = gen.generate(difficulty);
-
-            const t = translations[currentLang];
-            // Update UI Badges with combined translations
-            document.getElementById('difficulty-badge').textContent = t[difficulty].toUpperCase();
-            document.getElementById('seed-badge').textContent = `${t.seed}: ${seed}`;
-
-            // Update Toolbar Difficulty Active State
-            document.querySelectorAll('[data-i18n="easy"], [data-i18n="medium"], [data-i18n="hard"]').forEach(btn => {
-                const btnDiff = btn.getAttribute('data-i18n');
-                btn.classList.toggle('active', btnDiff === difficulty);
-            });
-
-            renderGrid();
-            renderStrip();
-            loadState();
-            applyTranslations(); // Re-apply to ensure button labels stay synced
-        }
-
-        // Action Handlers
-        function checkSolution() {
-            const stripInputs = [];
-            currentPuzzle.strip.forEach((val, i) => {
-                if (val === null) {
-                    stripInputs[i] = parseInt(document.querySelector(`[data-strip-index="${i}"]`).value);
-                } else {
-                    stripInputs[i] = null;
-                }
-            });
-
-            const gridInputs = [];
-            for (let i = 0; i < 16; i++) {
-                gridInputs.push({
-                    num1: parseInt(document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value),
-                    op: document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value,
-                    num2: parseInt(document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value)
-                });
-            }
-
-            const result = TetonorValidator.validate(currentPuzzle, { stripInputs, gridInputs });
-
-            // Apply Feedback
-            result.stripFeedback.forEach(f => {
-                const el = document.querySelector(`[data-strip-index="${f.index}"]`);
-                if (el) { el.classList.toggle('correct', f.correct); el.classList.toggle('incorrect', !f.correct); }
-            });
-
-            result.gridFeedback.forEach(f => {
-                ['num1', 'op', 'num2'].forEach(t => {
-                    const el = document.querySelector(`[data-grid-index="${f.index}"][data-input-type="${t}"]`);
-                    el.classList.toggle('correct', f.correct); el.classList.toggle('incorrect', !f.correct);
-                });
-            });
-
-            const t = translations[currentLang];
-            if (result.success) {
-                alert(t.validationSuccess);
-            } else {
-                alert(t.validationIncomplete);
-            }
-        }
-
-        // Initialize HUD
-        document.getElementById('prev-btn').onclick = () => {
-            const state = parseHash();
-            updateHash(Math.max(1, state.seed - 1), state.difficulty);
-        };
-        document.getElementById('next-btn').onclick = () => {
-            const state = parseHash();
-            updateHash(state.seed + 1, state.difficulty);
-        };
-        document.getElementById('reset-btn').onclick = () => {
-            const t = translations[currentLang];
-            if (confirm(t.confirmReset)) {
-                const state = parseHash();
-                localStorage.removeItem(`tetonor_${state.difficulty}_${state.seed}`);
-                updateHash(state.seed, state.difficulty);
-                renderPuzzle();
-            }
-        };
-        document.getElementById('check-btn').onclick = checkSolution;
-        document.getElementById('solve-btn').onclick = () => {
-            const t = translations[currentLang];
-            const btn = document.getElementById('solve-btn');
-
-            const solution = solver.solve(currentPuzzle.grid, currentPuzzle.strip);
-            if (solution) {
-                solution.strip.forEach((v, i) => {
-                    const el = document.querySelector(`[data-strip-index="${i}"]`);
-                    if (el) el.value = v;
-                });
-                solution.grid.forEach((c, i) => {
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num1"]`).value = c.num1;
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="op"]`).value = c.op;
-                    document.querySelector(`[data-grid-index="${i}"][data-input-type="num2"]`).value = c.num2;
-                });
-                saveState();
-            } else { alert(t.solveError); }
-        };
-
-        ['easy', 'medium', 'hard'].forEach(d => {
-            document.getElementById(`diff-${d}`).onclick = () => {
-                const state = parseHash();
-                updateHash(state.seed, d);
-            };
-        });
-
-        window.onhashchange = renderPuzzle;
-        applyTranslations();
-        renderPuzzle();
+        // Start 
+        init();
 
     </script>
-</body>
-
-</html>

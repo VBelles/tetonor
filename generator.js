@@ -1,41 +1,15 @@
-// Tetonor Puzzle Generator - Browser Version
-
+// Tetonor Puzzle Generator
 class TetonorGenerator {
-    constructor(seed = null) {
-        this.gridSize = 16; // 4x4 grid
-        this.stripSize = 16; // 8 pairs = 16 numbers
-        this.seed = seed;
-        this.rng = seed !== null ? this.createSeededRNG(seed) : null;
-    }
-
-    /**
-     * Create a seeded random number generator (Mulberry32)
-     */
-    createSeededRNG(seed) {
-        return function () {
-            let t = seed += 0x6D2B79F5;
-            t = Math.imul(t ^ t >>> 15, t | 1);
-            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-            return ((t ^ t >>> 14) >>> 0) / 4294967296;
-        };
-    }
-
-    /**
-     * Get random number (uses seeded RNG if available)
-     */
-    random() {
-        return this.rng ? this.rng() : Math.random();
-    }
-
     /**
      * Generate a Tetonor puzzle
      */
-    generate(difficulty = 'medium') {
+    static generate(seed = null, difficulty = 'medium') {
+        const rng = seed !== null ? this.createSeededRNG(seed) : () => Math.random();
         const config = this.getDifficultyConfig(difficulty);
-        const pairs = this.generatePairs(config);
+        const pairs = this.generatePairs(config, rng);
         const strip = this.buildStrip(pairs);
-        const grid = this.generateGrid(pairs, config);
-        const puzzleStrip = this.hideStripValues(strip, config);
+        const grid = this.generateGrid(pairs, rng);
+        const puzzleStrip = this.hideStripValues(strip, config, rng);
 
         return {
             difficulty,
@@ -49,9 +23,21 @@ class TetonorGenerator {
     }
 
     /**
+     * Create a seeded random number generator (Mulberry32)
+     */
+    static createSeededRNG(seed) {
+        return function () {
+            let t = seed += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+
+    /**
      * Get configuration based on difficulty
      */
-    getDifficultyConfig(difficulty) {
+    static getDifficultyConfig(difficulty) {
         const configs = {
             easy: {
                 minNumber: 2,
@@ -78,13 +64,16 @@ class TetonorGenerator {
     /**
      * Generate random number pairs
      */
-    generatePairs(config) {
+    static generatePairs(config, rng) {
         const pairs = [];
         const usedNumbers = new Set();
+        const maxAttempts = 1000;
+        let attempts = 0;
 
-        while (pairs.length < config.pairCount) {
-            const a = this.randomInt(config.minNumber, config.maxNumber);
-            const b = this.randomInt(config.minNumber, config.maxNumber);
+        while (pairs.length < config.pairCount && attempts < maxAttempts) {
+            attempts++;
+            const a = this.randomInt(config.minNumber, config.maxNumber, rng);
+            const b = this.randomInt(config.minNumber, config.maxNumber, rng);
 
             if (a === b) continue;
 
@@ -102,13 +91,18 @@ class TetonorGenerator {
             });
         }
 
+        // Fallback if we couldn't find enough pairs (unlikely but safe)
+        if (pairs.length < config.pairCount) {
+            console.warn("Could not generate enough unique pairs");
+        }
+
         return pairs;
     }
 
     /**
      * Build the complete strip from pairs
      */
-    buildStrip(pairs) {
+    static buildStrip(pairs) {
         const numbers = [];
         pairs.forEach(pair => {
             numbers.push(pair.numbers[0], pair.numbers[1]);
@@ -119,7 +113,7 @@ class TetonorGenerator {
     /**
      * Generate grid numbers using the pairs
      */
-    generateGrid(pairs, config) {
+    static generateGrid(pairs, rng) {
         const gridItems = [];
 
         pairs.forEach(pair => {
@@ -135,19 +129,19 @@ class TetonorGenerator {
             });
         });
 
-        this.shuffleArray(gridItems);
+        this.shuffleArray(gridItems, rng);
         return gridItems.map(item => item.value);
     }
 
     /**
      * Hide some strip values to create the puzzle
      */
-    hideStripValues(strip, config) {
+    static hideStripValues(strip, config, rng) {
         const puzzleStrip = [...strip];
         const revealCount = Math.floor(strip.length * config.revealedPercentage);
 
         const positions = Array.from({ length: strip.length }, (_, i) => i);
-        this.shuffleArray(positions);
+        this.shuffleArray(positions, rng);
 
         for (let i = revealCount; i < positions.length; i++) {
             puzzleStrip[positions[i]] = null;
@@ -159,16 +153,16 @@ class TetonorGenerator {
     /**
      * Random integer between min and max (inclusive)
      */
-    randomInt(min, max) {
-        return Math.floor(this.random() * (max - min + 1)) + min;
+    static randomInt(min, max, rng) {
+        return Math.floor(rng() * (max - min + 1)) + min;
     }
 
     /**
      * Shuffle array in place (Fisher-Yates)
      */
-    shuffleArray(array) {
+    static shuffleArray(array, rng) {
         for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(this.random() * (i + 1));
+            const j = Math.floor(rng() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
         }
     }

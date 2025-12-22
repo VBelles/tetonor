@@ -10,7 +10,7 @@ class TetonorSolver {
      * @param {number} maxAttempts - Limit the search space
      * @returns {Object|null} - The solution or null if not found
      */
-    solve(gridNumbers, stripValues, maxAttempts = 50000) {
+    static solve(gridNumbers, stripValues, maxAttempts = 50000) {
         const allPairs = this.findConsistentPairs(gridNumbers);
 
         // Try to find the correct 8-pair combination
@@ -30,7 +30,7 @@ class TetonorSolver {
     /**
      * Find all pairs that work for both addition and multiplication within the grid
      */
-    findConsistentPairs(gridNumbers) {
+    static findConsistentPairs(gridNumbers) {
         const pairMap = new Map();
 
         for (let i = 0; i < gridNumbers.length; i++) {
@@ -67,7 +67,7 @@ class TetonorSolver {
     /**
      * Get all divisor pairs of a number
      */
-    getDivisorPairs(n) {
+    static getDivisorPairs(n) {
         const pairs = [];
         for (let i = 1; i <= Math.sqrt(n); i++) {
             if (n % i === 0) {
@@ -81,7 +81,7 @@ class TetonorSolver {
     /**
      * Find the optimal 8-pair combination using a generator
      */
-    findOptimalCombination(allPairs, stripValues, maxAttempts) {
+    static findOptimalCombination(allPairs, stripValues, maxAttempts) {
         let tested = 0;
         let solution = null;
 
@@ -114,26 +114,13 @@ class TetonorSolver {
                 const [a, b] = p.pair;
 
                 // 1. Pruning by frequency (if we already have too many of a or b compared to known strip)
-                // Note: This is an optimistic check. We can't prune if we have fewer than known,
-                // only if we have MORE than the possible occurrences. Total spots = 16.
-                // Actually, simple count check:
                 const countA = (currentCounts.get(a) || 0) + 1;
                 const countB = (currentCounts.get(b) || 0) + (a === b ? 1 : 0);
-
-                // If the known strip has N of 'a', and we already used > N, is it invalid?
-                // Not necessarily, because some 'a's might be hidden (null).
-                // But if we know the TOTAL count of 'a' in the strip (by some logic)? 
-                // We don't. We only know partials.
-                // However, we know max count of any number can't exceed 16.
 
                 // 2. Pruning by grid availability: At least one "use" must be available
                 const availableUse = p.uses.find(u => !usedIndices.has(u.add.index) && !usedIndices.has(u.mult.index));
 
                 if (availableUse) {
-                    // Optimistically try all available uses? No, just try the first available for the pair
-                    // since any 'use' of the SAME pair is equivalent for the strip check.
-                    // If findGridAssignment is used at the end, it will handle multiple uses.
-
                     const nextUsed = new Set(usedIndices);
                     nextUsed.add(availableUse.add.index);
                     nextUsed.add(availableUse.mult.index);
@@ -153,7 +140,7 @@ class TetonorSolver {
         return solution;
     }
 
-    findGridAssignment(pairs, grid, pairIdx = 0) {
+    static findGridAssignment(pairs, grid, pairIdx = 0) {
         if (pairIdx === pairs.length) return grid;
         const p = pairs[pairIdx];
         const [a, b] = p.pair;
@@ -170,14 +157,9 @@ class TetonorSolver {
     }
 
     /**
-     * Verifies that the 8 pairs can actually cover all 16 cells uniquely
-     */
-
-
-    /**
      * Build standard 16-number strip from pairs
      */
-    buildStripFromPairs(pairs) {
+    static buildStripFromPairs(pairs) {
         const numbers = [];
         pairs.forEach(p => {
             numbers.push(p.pair[0], p.pair[1]);
@@ -188,7 +170,7 @@ class TetonorSolver {
     /**
      * Check if strip matches known puzzle values
      */
-    matchesKnownValues(strip, knownStrip) {
+    static matchesKnownValues(strip, knownStrip) {
         if (strip.length !== knownStrip.length) return false;
 
         for (let i = 0; i < strip.length; i++) {
@@ -200,20 +182,39 @@ class TetonorSolver {
     }
 
     /**
-     * Combination generator
+     * Run simulations to verify solver reliability
+     * Executable from console: TetonorSolver.runSimulations(100, 'medium')
      */
-    *combinations(array, n) {
-        if (n === 1) {
-            for (const item of array) {
-                yield [item];
+    static runSimulations(iterations = 1000, difficulty = 'medium') {
+        console.log(`%c🚀 Starting ${iterations} simulations for [${difficulty}]...`, "color: #2563eb; font-weight: bold;");
+        let failures = 0;
+        let totalTime = 0;
+
+        for (let i = 1; i <= iterations; i++) {
+            const seed = i;
+            const puzzle = TetonorGenerator.generate(seed, difficulty);
+
+            const start = performance.now();
+            const solution = this.solve(puzzle.grid, puzzle.strip);
+            const end = performance.now();
+
+            totalTime += (end - start);
+
+            if (!solution) {
+                console.error(`❌ Failed on seed ${seed}`);
+                failures++;
             }
-            return;
+
+            if (i % 100 === 0) {
+                console.log(`Progress: ${i}/${iterations} | Avg Time: ${(totalTime / i).toFixed(2)}ms`);
+            }
         }
 
-        for (let i = 0; i <= array.length - n; i++) {
-            for (const combo of this.combinations(array.slice(i + 1), n - 1)) {
-                yield [array[i], ...combo];
-            }
-        }
+        console.log(`%c✨ Basic Simulations Check Complete!`, "color: #059669; font-weight: bold;");
+        console.log(`Failures: ${failures}`);
+        console.log(`Average Solve Time: ${(totalTime / iterations).toFixed(2)}ms`);
     }
 }
+
+// Expose helper globally
+window.runSimulations = TetonorSolver.runSimulations;
