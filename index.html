@@ -196,6 +196,7 @@
             font-size: 1.1rem;
             background: transparent;
             font-family: inherit;
+            box-sizing: border-box;
         }
 
         .grid-inputs select {
@@ -215,17 +216,17 @@
             background-color: #000;
             border: 3px solid #000;
             margin-top: 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .strip-cell {
-            height: 60px;
+            height: 55px;
             background-color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
             position: relative;
+            padding-top: 6px;
         }
 
         .strip-cell.locked {
@@ -243,6 +244,43 @@
             font-size: 1.25rem;
             color: #2563eb;
             font-family: inherit;
+            position: relative;
+            z-index: 2;
+        }
+
+        .chip-container {
+            position: absolute;
+            top: 2px;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 3px;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .chip {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            box-sizing: border-box;
+            padding-bottom: 1px;
+        }
+
+        .chip-plus {
+            background-color: #64748b;
+        }
+
+        .chip-mult {
+            background-color: #94a3b8;
         }
 
         /* Callout */
@@ -404,6 +442,20 @@
                 flex: 0 0 30px;
             }
         }
+
+        /* Hide Spin Buttons */
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Firefox */
+        input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
     </style>
 </head>
 
@@ -531,6 +583,7 @@
                     grid: Array(16).fill({ num1: "", op: "", num2: "" })
                 });
             }
+            updateStripUsage();
         }
 
 
@@ -628,8 +681,14 @@
 
             document.getElementById('strip').innerHTML = puzzle.strip.map((val, i) =>
                 val !== null
-                    ? `<div class="strip-cell locked">${val}</div>`
-                    : `<div class="strip-cell"><input type="number" id="strip_${i}" class="strip-input"></div>`
+                    ? `<div class="strip-cell locked">
+                        ${val}
+                        <div class="chip-container" id="strip_chips_${i}"></div>
+                       </div>`
+                    : `<div class="strip-cell">
+                        <input type="number" id="strip_${i}" class="strip-input">
+                        <div class="chip-container" id="strip_chips_${i}"></div>
+                       </div>`
             ).join('');
 
             // Bind input changes to state saver
@@ -662,6 +721,7 @@
 
             const hash = `#${appState.difficulty}/${appState.seed}${encoded ? '/' + encoded : ''}`;
             history.replaceState(null, null, hash);
+            updateStripUsage();
         }
 
         function captureInputs() {
@@ -733,12 +793,49 @@
 
         function showFeedback(result) {
             result.stripFeedback?.forEach(f => {
-                document.getElementById(`strip_${f.index}`)?.classList.add(f.correct ? 'correct' : 'incorrect');
+                const el = document.getElementById(`strip_${f.index}`);
+                if (el) el.parentElement.classList.add(f.correct ? 'correct' : 'incorrect');
             });
             result.gridFeedback?.forEach(f => {
                 ['num1', 'op', 'num2'].forEach(type => {
                     document.getElementById(`grid_${f.index}_${type}`)?.classList.add(f.correct ? 'correct' : 'incorrect');
                 });
+            });
+        }
+
+        function updateStripUsage() {
+            const { grid, strip } = captureInputs();
+            const plusNeeded = {};
+            const multNeeded = {};
+
+            grid.forEach(cell => {
+                const { num1, op, num2 } = cell;
+                if (op === '+') {
+                    if (num1) plusNeeded[num1] = (plusNeeded[num1] || 0) + 1;
+                    if (num2) plusNeeded[num2] = (plusNeeded[num2] || 0) + 1;
+                } else if (op === '×') {
+                    if (num1) multNeeded[num1] = (multNeeded[num1] || 0) + 1;
+                    if (num2) multNeeded[num2] = (multNeeded[num2] || 0) + 1;
+                }
+            });
+
+            strip.forEach((val, i) => {
+                let value = val;
+                if (appState.puzzle && appState.puzzle.strip[i] !== null) {
+                    value = String(appState.puzzle.strip[i]);
+                }
+
+                let html = '';
+                if (plusNeeded[value] > 0) {
+                    html += `<div class="chip chip-plus">+</div>`;
+                    plusNeeded[value]--;
+                }
+
+                if (multNeeded[value] > 0) {
+                    html += `<div class="chip chip-mult">×</div>`;
+                    multNeeded[value]--;
+                }
+                document.getElementById(`strip_chips_${i}`).innerHTML = html;
             });
         }
 
